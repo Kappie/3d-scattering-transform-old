@@ -4,7 +4,7 @@ from transforms3d.euler import euler2mat
 from cube_show_slider import cube_show_slider
 
 def mother_gabor(u, xi, sigma):
-    return np.exp(-np.dot(u, u)/2*sigma + 1j*np.dot(xi, u))
+    return np.exp(-np.dot(u, u)/(2*sigma**2) + 1j*np.dot(xi, u))
 
 def gabor_filter(j, alpha, beta, gamma, dimensions, xi=np.array([3*np.pi/4, 0, 0]), sigma=1, a=2):
     """
@@ -26,13 +26,11 @@ def gabor_filter(j, alpha, beta, gamma, dimensions, xi=np.array([3*np.pi/4, 0, 0
 
     return gab_filter
 
+def gaussian_filter(J, dimensions):
+    return np.real( gabor_filter(J, 0, 0, 0, dimensions, xi=np.array([0, 0, 0])) )
+
 def gabor_filters(js, alphas, betas, gammas, dimensions):
     return 0
 
 def center(index, list_length):
     return int(np.floor(index - (list_length-1)/2))
-
-filter = np.real(gabor_filter(3, np.pi/2, np.pi/2, 0, [41, 41, 11]))
-# print(filter)
-#
-# cube_show_slider(filter)
