@@ -87,13 +87,12 @@ def crop_freq_3d(x, res):
 
 
 # def filters_bank(M, N, J, L=8):
-def filter_bank(width, height, depth, js, J, L, m=2):
+def filter_bank(width, height, depth, js, J, L):
     """
     js: length scales for filters. Filters will be dilated by 2**j for j in js.
     J: length scale used for averaging over scattered signals. (coefficients will be approximately translationally
     invariant over 2**J pixels.)
     L: number of angles for filters, spaced evenly in (0, pi).
-    m: number of layers in transform.
     """
     filters = {}
     filters['psi'] = []
