@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import scipy.signal
+import scipy.fftpack as fft
 from transforms3d.euler import euler2mat
 from cube_show_slider import cube_show_slider
 from itertools import product
@@ -36,18 +37,18 @@ def gabor_filters(J, alphas, betas, gammas):
 def center(index, list_length):
     return int(np.floor(index - (list_length-1)/2))
 
-def crop(data, lower_threshold=1e-4):
-    """
-    Crops array of complex numbers if absolute value is smaller than lower_threshold
-    """
-    for i in range(data.ndim):
-        data = np.swapaxes(data, 0, i)  # send i-th axis to front
-        while np.all( np.absolute(data)[0]<lower_threshold ):
-            data = data[1:]
-        while np.all( np.absolute(data)[-1]<lower_threshold ):
-            data = data[:-1]
-        data = np.swapaxes(data, 0, i)  # send i-th axis to its original position
-    return data
+# def crop(data, lower_threshold=1e-4):
+#     """
+#     Crops array of complex numbers if absolute value is smaller than lower_threshold
+#     """
+#     for i in range(data.ndim):
+#         data = np.swapaxes(data, 0, i)  # send i-th axis to front
+#         while np.all( np.absolute(data)[0]<lower_threshold ):
+#             data = data[1:]
+#         while np.all( np.absolute(data)[-1]<lower_threshold ):
+#             data = data[:-1]
+#         data = np.swapaxes(data, 0, i)  # send i-th axis to its original position
+#     return data
 
 
 def crop_freq_3d(x, res):
@@ -104,14 +105,16 @@ def filter_bank(width, height, depth, js, J, L, m=2):
         psi_signal = gabor_filter(width, height, depth, j, alpha, beta, gamma)
         psi_signal_fourier = fft.fftn(psi_signal)
         # When j_1 < j_2 < ... < j_n, we need j_2, ..., j_n downsampled at j_1, j_3, ..., j_n downsampled at j_2, etc.
-        # resolution 0 is just the signal itself.
+        # resolution 0 is just the signal itself. See below header "Fast scattering computation" in Bruna (2013).
         for resolution in range(j + 1):
             psi_signal_fourier_res = crop_freq_3d(psi_signal_fourier, resolution)
-            psi[resolution] = tf.constant(np.stack((np.real(
-                psi_signal_fourier_res), np.imag(psi_signal_fourier_res)), axis=2))
+            psi[resolution] = tf.constant(psi_signal_fourier_res, dtype='complex64')
+            # psi[resolution] = tf.constant(np.stack((np.real(
+            #     psi_signal_fourier_res), np.imag(psi_signal_fourier_res)), axis=3))
             # How to normalize this?
             psi[resolution] = tf.div(
-                psi[resolution], (width * height * depth // 2**(2 * j)), name="psi_theta%s_j%s" % (theta, j))
+                psi[resolution], (width * height * depth // 2**(2 * j)),
+                name="psi_j%s_alpha%s_beta%s_gamma%s" % (j, alpha, beta, gamma))
 
         filters['psi'].append(psi)
 
@@ -122,9 +125,10 @@ def filter_bank(width, height, depth, js, J, L, m=2):
     filters['phi']['j'] = J
     # We need the phi signal downsampled at all length scales j.
     for resolution in js:
-        phi_signal_fourier_res = crop_freq(phi_signal_fourier, resolution)
-        filters['phi'][resolution] = tf.constant(
-            np.stack((np.real(phi_signal_fourier_res), np.imag(phi_signal_fourier_res)), axis=2))
+        phi_signal_fourier_res = crop_freq_3d(phi_signal_fourier, resolution)
+        filters['phi'][resolution] = tf.constant(phi_signal_fourier_res, dtype="complex64")
+        # filters['phi'][resolution] = tf.constant(
+        #     np.stack((np.real(phi_signal_fourier_res), np.imag(phi_signal_fourier_res)), axis=3))
         filters['phi'][resolution] = tf.div(
             filters['phi'][resolution], (width * height * depth // 2**(2 * J)), name="phi_res%s" % resolution)
 

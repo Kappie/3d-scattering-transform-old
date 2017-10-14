@@ -27,7 +27,7 @@ class IndexTracker(object):
         self.im.axes.figure.canvas.draw()
 
 
-def plot_slices(X):
+def plot3d(X):
     """
     X is a height x width x depth array.
     """
@@ -37,7 +37,7 @@ def plot_slices(X):
     plt.show()
 
 
-def plot_2d_array(X):
+def plot2d(X):
     img = plt.imshow(X, interpolation='nearest')
     plt.axis('off')
     plt.show()
