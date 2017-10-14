@@ -1,36 +1,41 @@
-from wavelets import gaussian_filter, gabor_filter
+import matplotlib
+matplotlib.use('TkAgg')
+from wavelets import gaussian_filter, gabor_filter, crop_freq_3d
 from plot_slices import plot_slices, plot_2d_array
 from filters_bank import crop_freq, morlet_2d
 import numpy as np
 import scipy.fftpack as fft
 import scipy.ndimage as ndim
-from scipy.misc import imshow
+import scipy.misc
 import matplotlib.pyplot as plt
 
 
-
-def middle_hole_mask(x):
-    hole_size = 126
-    M, N = x.shape
-    mask = np.ones([M, N])
-    mask[int((M - hole_size)/2):int((M + hole_size)/2), int((N - hole_size)/2):int((N + hole_size)/2)] = 0
-    return mask
-
-
-
-def crop_high_frequencies(x):
-    mask = middle_hole_mask(x)
-    return np.multiply(x, mask)
-
 # 128 x 128
 image = ndim.imread("mona_lisa.gif", flatten=True)
-fourier_image = fft.fft2(image)
-cropped_fourier_image = crop_high_frequencies(fourier_image)
-cropped_fourier_image = crop_freq(fourier_image, 3)
-reconstruction = np.absolute( fft.ifft2(cropped_fourier_image) )
-plt.figure()
-plt.imshow(np.log(np.absolute(fft.fft2(reconstruction))))
-plt.show()
+image = np.swapaxes(np.array([image, image, image, image]), 0, 2)
+image = np.swapaxes(image, 0, 1)
+
+res = 1
+fourier_image = fft.fftn(image)
+cropped_fourier_image = crop_freq_3d(fourier_image, res)
+reconstruction = np.absolute( fft.ifftn(cropped_fourier_image) )
+
+plot_2d_array(reconstruction[:, :, 0])
+
+
+# plt.figure()
+# plt.imshow(reconstruction[:, :, 0])
+# plt.show()
+
+
+
+# fourier_image = fft.fft2(image)
+# cropped_fourier_image = crop_high_frequencies(fourier_image)
+# cropped_fourier_image = crop_freq(fourier_image, 3)
+# reconstruction = np.absolute( fft.ifft2(cropped_fourier_image) )
+# plt.figure()
+# plt.imshow(np.log(np.absolute(fft.fft2(reconstruction))))
+# plt.show()
 
 # inverse_fourier_image = fft.ifft2(fourier_image)
 # plot_2d_array(np.log(np.absolute(fourier_image)))

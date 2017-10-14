@@ -8,7 +8,7 @@ from itertools import product
 def mother_gabor(u, xi, sigma):
     return np.exp(-np.dot(u, u)/(2*sigma**2) + 1j*np.dot(xi, u))
 
-def gabor_filter(j, alpha, beta, gamma, max_dimension=int(40), xi=np.array([3*np.pi/4, 0, 0]), sigma=1, a=2):
+def gabor_filter(width, height, depth, j, alpha, beta, gamma, xi=np.array([3*np.pi/4, 0, 0]), sigma=1, a=2):
     """
     xi: modulation of periodic part of wavelet
     sigma: standard deviation of gaussian window
@@ -17,7 +17,6 @@ def gabor_filter(j, alpha, beta, gamma, max_dimension=int(40), xi=np.array([3*np
     # xi = np.array([0, 0, 0])
     rotation_matrix = euler2mat(alpha, beta, gamma, 'sxyz')
 
-    width = height = depth = max_dimension
     gab_filter = np.zeros([width, height, depth], dtype=np.complex)
     for x in range(width):
         for y in range(height):
@@ -26,10 +25,10 @@ def gabor_filter(j, alpha, beta, gamma, max_dimension=int(40), xi=np.array([3*np
                 rotated_u = np.dot(rotation_matrix, np.array([centered_x, centered_y, centered_z]))
                 gab_filter[x, y, z] = (a**-j)*(1/sigma)*mother_gabor(rotated_u*a**-j, xi, sigma)
 
-    return crop(gab_filter)
+    return gab_filter
 
-def gaussian_filter(J):
-    return np.real( gabor_filter(J, 0, 0, 0, xi=np.array([0, 0, 0])) )
+def gaussian_filter(width, height, depth, J):
+    return np.real( gabor_filter(width, height, depth, J, 0, 0, 0, xi=np.array([0, 0, 0])) )
 
 def gabor_filters(J, alphas, betas, gammas):
     return [ [ [ [ gabor_filter(j, alpha, beta, gamma) for gamma in gammas ] for beta in betas ] for alpha in alphas ] for j in range(J) ]
@@ -77,10 +76,56 @@ def crop_freq_3d(x, res):
     # of fourier spectrum of a real signal (e.g. an image).
     for a in range(A):
         for b in range(B):
-            for c in range(C)
+            for c in range(C):
                 for i in range(int(2 ** res)):
                     for j in range(int(2 ** res)):
                         for k in range(int(2 ** res)):
                             crop[a, b, c] += x[a + i*A, b + j*B, c + k*C]
 
     return crop
+
+
+# def filters_bank(M, N, J, L=8):
+def filter_bank(width, height, depth, js, J, L, m=2):
+    """
+    js: length scales for filters. Filters will be dilated by 2**j for j in js.
+    J: length scale used for averaging over scattered signals. (coefficients will be approximately translationally
+    invariant over 2**J pixels.)
+    L: number of angles for filters, spaced evenly in (0, pi).
+    m: number of layers in transform.
+    """
+    filters = {}
+    filters['psi'] = []
+
+    alphas = betas = gammas = [(n/(L-1)) * np.pi for n in range(L)]
+
+    for j, alpha, beta, gamma in product(js, alphas, betas, gammas):
+        psi = {'j': j, 'alpha': alpha, 'beta': beta, 'gamma': gamma}
+        psi_signal = gabor_filter(width, height, depth, j, alpha, beta, gamma)
+        psi_signal_fourier = fft.fftn(psi_signal)
+        # When j_1 < j_2 < ... < j_n, we need j_2, ..., j_n downsampled at j_1, j_3, ..., j_n downsampled at j_2, etc.
+        # resolution 0 is just the signal itself.
+        for resolution in range(j + 1):
+            psi_signal_fourier_res = crop_freq_3d(psi_signal_fourier, resolution)
+            psi[resolution] = tf.constant(np.stack((np.real(
+                psi_signal_fourier_res), np.imag(psi_signal_fourier_res)), axis=2))
+            # How to normalize this?
+            psi[resolution] = tf.div(
+                psi[resolution], (width * height * depth // 2**(2 * j)), name="psi_theta%s_j%s" % (theta, j))
+
+        filters['psi'].append(psi)
+
+    filters['phi'] = {}
+    # phi_signal = gabor_2d(M, N, 0.8 * 2**(J - 1), 0, 0, offset=offset_unpad)
+    phi_signal = gaussian_filter(width, height, depth, J)
+    phi_signal_fourier = fft.fftn(phi_signal)
+    filters['phi']['j'] = J
+    # We need the phi signal downsampled at all length scales j.
+    for resolution in js:
+        phi_signal_fourier_res = crop_freq(phi_signal_fourier, resolution)
+        filters['phi'][resolution] = tf.constant(
+            np.stack((np.real(phi_signal_fourier_res), np.imag(phi_signal_fourier_res)), axis=2))
+        filters['phi'][resolution] = tf.div(
+            filters['phi'][resolution], (width * height * depth // 2**(2 * J)), name="phi_res%s" % resolution)
+
+    return filters
