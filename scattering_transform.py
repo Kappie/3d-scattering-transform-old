@@ -24,15 +24,27 @@ def scattering_transform(X, js, J, L):
     transforms = []
     X_fourier = tf.fft3d(X)
 
-    zeroth_level_coefficents = perform_convolution(X_fourier, phis[0], J)
-    scattering_coefficients.append(zeroth_level_coefficents)
+    # First low-pass filter: Extract zeroth order coefficients
+    zeroth_order_coefficents = tf.ifft3d(X_fourier * phis[0])
+    # Downsample by factor 2**J
+    zeroth_order_coefficents = downsample(zeroth_order_coefficents, 2**J)
+    scattering_coefficients.append(zeroth_order_coefficents)
 
     for n1 in range(len(psis)):
         j1 = psis[n1]['j']
-        # Downsampling factor doesn't work for now.
-        transforms = X_fourier * psis[n1][0]
-        # supposed to be phis[j1] and downsampling factor j1
-        first_order_coefficients = perform_convolution(transforms, phis[0], 0)
+
+        # Calculate wavelet transform and apply modulus. Signal can be downsampled at 2**j1 without losing much energy.
+        # See Bruna (2013).
+        transform = tf.abs( tf.ifft3d(X_fourier * psis[n1][0]) )
+        if j1 > 0:
+            transform = downsample(transform, 2**j1)
+        transform_fourier = tf.fft3d(transform)
+
+        # Second low-pass filter: Extract first order coefficients.
+        # The transform is already downsampled by 2**j1, so we take the version of phi that is downsampled by the same
+        # factor. The scattering coefficients itself can be sampled at 2**J, so a downsampling of 2**(J - j1) remains.
+        first_order_coefficents = tf.ifft3d(transform_fourier * phis[j1])
+        first_order_coefficents = downsample(first_order_coefficents, 2**(J-j1))
         scattering_coefficients.append(first_order_coefficients)
 
         for n2 in range(len(psis)):
@@ -48,14 +60,27 @@ def scattering_transform(X, js, J, L):
 
 def perform_convolution(signals, filter, downsampling_factor):
     """
-    Remember that the signals and averaging filter are in Fourier space. 2 ** (downsampling
-    factor) should be equal to the spatial window of the averaging filter.
+    Remember that the signals and filter are in Fourier space.
     shape(signals) is num_samples x width x height x depth
     """
     # Computes 3d FFT over innermost 3 dimensions.
     convolution = tf.ifft3d(signals * filter)
     return convolution
 
+
+def downsample(signal, factor):
+    """
+    Signal NWHD format in real space.
+    """
+
+    signal_shape = signal.get_shape().as_list()
+    # Append dummy dimension to indicate that number_of_channels = 1. (Required for pool operation.)
+    signal = tf.reshape(signal, signal_shape + [1])
+    # No pooling over num_samples or num_channels.
+    window_size = [1, factor, factor, factor, 1]
+    strides =     [1, factor, factor, factor, 1]
+    downsampled_signal = tf.nn.avg_pool3d(signal, window_size, strides, "VALID")
+    return downsampled_signal
 
 
 js = [0, 1, 2]
