@@ -2,6 +2,7 @@ import numpy as np
 from sklearn import datasets
 from scipy.sparse.linalg import eigs
 from plot_slices import plot2d
+from sklearn_digits_tut import get_digits_classifier
 
 # Implements the visualisation method described in Adel et al.
 # 3D scattering transforms for disease classification in neuroimaging (2017).
