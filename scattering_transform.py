@@ -18,7 +18,9 @@ def scattering_transform(X, js, J, L):
     """
 
     n_samples, width, height, depth = X.get_shape().as_list()
+    print("building filter bank...")
     filters = filter_bank(width, height, depth, js, J, L)
+    print("built filter bank.")
     psis = filters['psi']
     phis = filters['phi']
     scattering_coefficients = []

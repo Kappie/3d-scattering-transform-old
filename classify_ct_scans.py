@@ -14,8 +14,8 @@ def load_data():
     return 1
 
 if __name__ == '__main__':
-    DATASET_PATH = r"D:\Geert\SOFT_TISSUE_THICK_NUMPIFIED\dataset.npy"
-    LABELS_PATH = r"D:\Geert\SOFT_TISSUE_THICK_NUMPIFIED\labels.npy"
+    DATASET_PATH = r"D:\Geert\SOFT_TISSUE_THICK_DOWNSAMPLED_NUMPIFIED\dataset.npy"
+    LABELS_PATH = r"D:\Geert\SOFT_TISSUE_THICK_DOWNSAMPLED_NUMPIFIED\labels.npy"
     AFFECTED = 1
     UNAFFECTED = -1
 
@@ -29,8 +29,8 @@ if __name__ == '__main__':
     J = 2
     L = 2
 
-    print("casting images as variable tensor... array of shape {}.".format(small_dataset.shape))
-    X = tf.Variable(small_dataset, dtype=tf.complex64)
+    print("casting images as constant tensor... array of shape {}.".format(small_dataset.shape))
+    X = tf.constant(small_dataset, dtype=tf.complex64)
 
     print("let's scatter")
     S = scattering_transform(X, js, J, L)

@@ -97,11 +97,13 @@ def filter_bank(width, height, depth, js, J, L):
         # resolution 0 is just the signal itself. See below header "Fast scattering computation" in Bruna (2013).
         for resolution in range(j + 1):
             psi_signal_fourier_res = crop_freq_3d(psi_signal_fourier, resolution)
+            print("casting psi as constant tensor...")
             psi[resolution] = tf.constant(psi_signal_fourier_res, dtype='complex64')
             # What is the justification for this normalisation?
             psi[resolution] = tf.div(
                 psi[resolution], (width * height * depth // 2**(2 * j)),
                 name="psi_j%s_alpha%s_beta%s_gamma%s" % (j, alpha, beta, gamma))
+            print("done.")
 
         filters['psi'].append(psi)
 
@@ -112,8 +114,10 @@ def filter_bank(width, height, depth, js, J, L):
     # We need the phi signal downsampled at all length scales j.
     for resolution in js:
         phi_signal_fourier_res = crop_freq_3d(phi_signal_fourier, resolution)
+        print("casting phi as constant tensor...")
         filters['phi'][resolution] = tf.constant(phi_signal_fourier_res, dtype="complex64")
         filters['phi'][resolution] = tf.div(
             filters['phi'][resolution], (width * height * depth // 2**(2 * J)), name="phi_res%s" % resolution)
+        print("done.")
 
     return filters
