@@ -19,17 +19,20 @@ if __name__ == '__main__':
     AFFECTED = 1
     UNAFFECTED = -1
 
-    dataset = np.load(DATASET_PATH)
+    print("loading dataset with memory map")
+    dataset = np.load(DATASET_PATH, mmap_mode='r')
     labels = np.load(LABELS_PATH)
 
     small_dataset = dataset[0:2]
-    print(small_dataset.shape)
 
     js = [0, 1]
     J = 2
     L = 2
 
-    X = tf.constant(dataset, dtype="complex64")
+    print("casting images as variable tensor... array of shape {}.".format(small_dataset.shape))
+    X = tf.Variable(small_dataset, dtype=tf.complex64)
+
+    print("let's scatter")
     S = scattering_transform(X, js, J, L)
 
     with tf.Session() as sess:

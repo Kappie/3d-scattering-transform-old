@@ -104,7 +104,7 @@ if __name__ == '__main__':
     J = 2
     L = 2
 
-    random_sample = np.random.random([9, 8, 7])
+    random_sample = np.random.random([8, 8, 8])
     three_samples = np.array([random_sample, random_sample, random_sample])
 
     X = tf.constant(three_samples, dtype="complex64")

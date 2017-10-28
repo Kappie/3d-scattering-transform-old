@@ -6,8 +6,10 @@ from transforms3d.euler import euler2mat
 from cube_show_slider import cube_show_slider
 from itertools import product
 
+
 def mother_gabor(u, xi, sigma):
     return np.exp(-np.dot(u, u)/(2*sigma**2) + 1j*np.dot(xi, u))
+
 
 def gabor_filter(width, height, depth, j, alpha, beta, gamma, xi=np.array([3*np.pi/4, 0, 0]), sigma=1, a=2):
     """
@@ -15,7 +17,6 @@ def gabor_filter(width, height, depth, j, alpha, beta, gamma, xi=np.array([3*np.
     sigma: standard deviation of gaussian window
     a: scale parameter
     """
-    # xi = np.array([0, 0, 0])
     rotation_matrix = euler2mat(alpha, beta, gamma, 'sxyz')
 
     gab_filter = np.zeros([width, height, depth], dtype=np.complex)
@@ -28,27 +29,17 @@ def gabor_filter(width, height, depth, j, alpha, beta, gamma, xi=np.array([3*np.
 
     return gab_filter
 
+
 def gaussian_filter(width, height, depth, J):
     return np.real( gabor_filter(width, height, depth, J, 0, 0, 0, xi=np.array([0, 0, 0])) )
+
 
 def gabor_filters(J, alphas, betas, gammas):
     return [ [ [ [ gabor_filter(j, alpha, beta, gamma) for gamma in gammas ] for beta in betas ] for alpha in alphas ] for j in range(J) ]
 
+
 def center(index, list_length):
     return int(np.floor(index - (list_length-1)/2))
-
-# def crop(data, lower_threshold=1e-4):
-#     """
-#     Crops array of complex numbers if absolute value is smaller than lower_threshold
-#     """
-#     for i in range(data.ndim):
-#         data = np.swapaxes(data, 0, i)  # send i-th axis to front
-#         while np.all( np.absolute(data)[0]<lower_threshold ):
-#             data = data[1:]
-#         while np.all( np.absolute(data)[-1]<lower_threshold ):
-#             data = data[:-1]
-#         data = np.swapaxes(data, 0, i)  # send i-th axis to its original position
-#     return data
 
 
 def crop_freq_3d(x, res):
@@ -86,7 +77,6 @@ def crop_freq_3d(x, res):
     return crop
 
 
-# def filters_bank(M, N, J, L=8):
 def filter_bank(width, height, depth, js, J, L):
     """
     js: length scales for filters. Filters will be dilated by 2**j for j in js.
@@ -108,9 +98,7 @@ def filter_bank(width, height, depth, js, J, L):
         for resolution in range(j + 1):
             psi_signal_fourier_res = crop_freq_3d(psi_signal_fourier, resolution)
             psi[resolution] = tf.constant(psi_signal_fourier_res, dtype='complex64')
-            # psi[resolution] = tf.constant(np.stack((np.real(
-            #     psi_signal_fourier_res), np.imag(psi_signal_fourier_res)), axis=3))
-            # How to normalize this?
+            # What is the justification for this normalisation?
             psi[resolution] = tf.div(
                 psi[resolution], (width * height * depth // 2**(2 * j)),
                 name="psi_j%s_alpha%s_beta%s_gamma%s" % (j, alpha, beta, gamma))
@@ -118,7 +106,6 @@ def filter_bank(width, height, depth, js, J, L):
         filters['psi'].append(psi)
 
     filters['phi'] = {}
-    # phi_signal = gabor_2d(M, N, 0.8 * 2**(J - 1), 0, 0, offset=offset_unpad)
     phi_signal = gaussian_filter(width, height, depth, J)
     phi_signal_fourier = fft.fftn(phi_signal)
     filters['phi']['j'] = J
@@ -126,8 +113,6 @@ def filter_bank(width, height, depth, js, J, L):
     for resolution in js:
         phi_signal_fourier_res = crop_freq_3d(phi_signal_fourier, resolution)
         filters['phi'][resolution] = tf.constant(phi_signal_fourier_res, dtype="complex64")
-        # filters['phi'][resolution] = tf.constant(
-        #     np.stack((np.real(phi_signal_fourier_res), np.imag(phi_signal_fourier_res)), axis=3))
         filters['phi'][resolution] = tf.div(
             filters['phi'][resolution], (width * height * depth // 2**(2 * J)), name="phi_res%s" % resolution)
 
