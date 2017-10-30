@@ -14,28 +14,24 @@ def load_data():
     return 1
 
 if __name__ == '__main__':
-    DATASET_PATH = r"D:\Geert\SOFT_TISSUE_THICK_DOWNSAMPLED_NUMPIFIED\dataset.npy"
-    LABELS_PATH = r"D:\Geert\SOFT_TISSUE_THICK_DOWNSAMPLED_NUMPIFIED\labels.npy"
-    AFFECTED = 1
-    UNAFFECTED = -1
+    # DATASET_PATH = r"D:\Geert\SOFT_TISSUE_THICK_DOWNSAMPLED_NUMPIFIED\dataset.npy"
+    # LABELS_PATH = r"D:\Geert\SOFT_TISSUE_THICK_DOWNSAMPLED_NUMPIFIED\labels.npy"
+    # AFFECTED = 1
+    # UNAFFECTED = -1
+    #
+    # print("loading dataset with memory map")
+    # dataset = np.load(DATASET_PATH, mmap_mode='r')
+    # labels = np.load(LABELS_PATH)
 
-    print("loading dataset with memory map")
-    dataset = np.load(DATASET_PATH, mmap_mode='r')
-    labels = np.load(LABELS_PATH)
-
-    small_dataset = dataset[0:2]
+    x = z = 64
+    y = 128
+    single_sample = np.random.rand(x, y, z)
 
     js = [0, 1]
     J = 2
     L = 2
 
-    print("casting images as constant tensor... array of shape {}.".format(small_dataset.shape))
-    X = tf.constant(small_dataset, dtype=tf.complex64)
+    print("let's scatter. Shape of input is {}.".format(single_sample.shape))
+    S = scattering_transform(single_sample, js, J, L)
 
-    print("let's scatter")
-    S = scattering_transform(X, js, J, L)
-
-    with tf.Session() as sess:
-        result = sess.run(S)
-
-    print(result.shape)
+    print(S.shape)

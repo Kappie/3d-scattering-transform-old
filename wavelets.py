@@ -6,7 +6,6 @@ from transforms3d.euler import euler2mat
 from cube_show_slider import cube_show_slider
 from itertools import product
 import numba
-import time
 
 
 # def mother_gabor(u, xi, sigma):
