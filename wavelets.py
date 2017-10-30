@@ -5,6 +5,8 @@ import scipy.fftpack as fft
 from transforms3d.euler import euler2mat
 from cube_show_slider import cube_show_slider
 from itertools import product
+import numba
+import time
 
 
 # def mother_gabor(u, xi, sigma):
@@ -74,7 +76,6 @@ from itertools import product
 #
 #     return crop
 
-
 def gabor_filter(width, height, depth, j, alpha, beta, gamma, xi=np.array([3*np.pi/4, 0, 0]), a=2, sigma=1):
     """
     Outputs gabor filter of shape `dimensions`.
@@ -115,6 +116,9 @@ def crop_freq_3d(x, res):
     Corresponds to a spatial downsampling of the image by a factor (res + 1).
     Expects dimensions of array to be powers of 2.
     """
+    if res == 0:
+        return x
+
     M, N, O = x.shape[0], x.shape[1], x.shape[2]
     end_x, end_y, end_z = [int(dim * 2 ** (-res - 1)) for dim in [M, N, O]]
     indices_x, indices_y, indices_z = [ list(range(end_index)) + list(range(-end_index, 0)) for end_index in [end_x, end_y, end_z] ]
@@ -142,11 +146,7 @@ def filter_bank(width, height, depth, js, J, L):
         # resolution 0 is just the signal itself. See below header "Fast scattering computation" in Bruna (2013).
         for resolution in range(j + 1):
             psi_signal_fourier_res = crop_freq_3d(psi_signal_fourier, resolution)
-            psi[resolution] = tf.constant(psi_signal_fourier_res, dtype='complex64')
-            # What is the justification for this normalisation?
-            psi[resolution] = tf.div(
-                psi[resolution], (width * height * depth // 2**(2 * j)),
-                name="psi_j%s_alpha%s_beta%s_gamma%s" % (j, alpha, beta, gamma))
+            psi[resolution] = normalize(psi_signal_fourier_res, width, height, depth, j)
 
         filters['psi'].append(psi)
 
@@ -157,24 +157,23 @@ def filter_bank(width, height, depth, js, J, L):
     # We need the phi signal downsampled at all length scales j.
     for resolution in js:
         phi_signal_fourier_res = crop_freq_3d(phi_signal_fourier, resolution)
-        filters['phi'][resolution] = tf.constant(phi_signal_fourier_res, dtype="complex64")
-        filters['phi'][resolution] = tf.div(
-            filters['phi'][resolution], (width * height * depth // 2**(2 * J)), name="phi_res%s" % resolution)
+        filters['phi'][resolution] = normalize(phi_signal_fourier_res, width, height, depth, J)
 
     return filters
 
 
-if __name__ == '__main__':
-    x = z = 200
-    y = 400
-    js = [0, 1]
-    J = 2
-    L = 2
+def normalize(signal, width, height, depth, j):
+    return signal / (width * height * depth // 2**(2*j))
 
-    import time
+
+if __name__ == '__main__':
+    y = 128
+    x = z = 64
+    js = [0, 1, 2]
+    J = 3
+    L = 3
 
     start = time.time()
     filters = filter_bank(x, y, z, js, J, L)
     end = time.time()
-
     print(end - start)
