@@ -96,80 +96,16 @@ def downsample(signal, factor):
     return tf.reshape(downsampled_signal, new_signal_shape)
 
 
-js = [0, 1, 2]
-J = 3
-L = 2
-X = tf.constant(np.array([np.random.random([8, 8, 8])]), dtype="complex64")
+if __name__ == '__main__':
+    js = [0, 1, 2]
+    J = 3
+    L = 2
+    X = tf.constant(np.array([np.random.random([8, 8, 8])]), dtype="complex64")
 
-S = scattering_transform(X, js, J, L)
+    S = scattering_transform(X, js, J, L)
 
-with tf.Session() as sess:
-    result = sess.run(S)
-    print(result)
-    print(result.shape)
-    # plot3d(np.absolute(result[0, :, :, :]))
-
-
-
-# def __call__(self, x):
-#     x_shape = x.get_shape().as_list()
-#     x_h, x_w = x_shape[-2:]
-#
-#     if (x_w != self.N or x_h != self.M):
-#         raise (RuntimeError('Tensor must be of spatial size (%i, %i)!' % (self.M, self.N)))
-#
-#     if (len(x_shape) != 4):
-#         raise (RuntimeError('Input tensor must be 4D'))
-#
-#     J = self.J
-#     phi = self.Phi
-#     psi = self.Psi
-#     n = 0
-#
-#     pad = self._pad
-#     unpad = self._unpad
-#
-#     S = []
-#     U_r = pad(x)
-#
-#     U_0_c = compute_fft(U_r, 'C2C')  # We trick here with U_r and U_2_c
-#     print(U_0_c, phi[0], U_r)
-#     U_1_c = periodize(cdgmm(U_0_c, phi[0]), 2**J)
-#     U_J_r = compute_fft(U_1_c, 'C2R')
-#
-#     S.append(unpad(U_J_r))
-#     n = n + 1
-#
-#     for n1 in range(len(psi)):
-#         j1 = psi[n1]['j']
-#         U_1_c = cdgmm(U_0_c, psi[n1][0])
-#         if j1 > 0:
-#             U_1_c = periodize(U_1_c, k=2 ** j1)
-#         U_1_c = compute_fft(U_1_c, 'C2C', inverse=True)
-#         U_1_c = compute_fft(modulus(U_1_c), 'C2C')
-#
-#         # Second low pass filter
-#         U_2_c = periodize(cdgmm(U_1_c, phi[j1]), k=2**(J - j1))
-#         U_J_r = compute_fft(U_2_c, 'C2R')
-#         S.append(unpad(U_J_r))
-#         n = n + 1
-#
-#         for n2 in range(len(psi)):
-#             j2 = psi[n2]['j']
-#             if j1 < j2:
-#                 U_2_c = periodize(cdgmm(U_1_c, psi[n2][j1]), k=2 ** (j2 - j1))
-#                 U_2_c = compute_fft(U_2_c, 'C2C', inverse=True)
-#                 U_2_c = compute_fft(modulus(U_2_c), 'C2C')
-#
-#                 # Third low pass filter
-#                 U_2_c = periodize(cdgmm(U_2_c, phi[j2]), k=2 ** (J - j2))
-#                 U_J_r = compute_fft(U_2_c, 'C2R')
-#
-#                 S.append(unpad(U_J_r))
-#                 n = n + 1
-#
-#     if self.check:
-#         return S
-#
-#     S = tf.concat(S, axis=1)
-#     return S
+    with tf.Session() as sess:
+        result = sess.run(S)
+        print(result)
+        print(result.shape)
+        # plot3d(np.absolute(result[0, :, :, :]))
