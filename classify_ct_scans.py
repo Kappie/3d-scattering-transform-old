@@ -23,15 +23,16 @@ if __name__ == '__main__':
     # dataset = np.load(DATASET_PATH, mmap_mode='r')
     # labels = np.load(LABELS_PATH)
 
-    x = z = 128
-    y = 256
+    x = z = 32
+    y = 64
     single_sample = np.random.rand(x, y, z).astype(np.complex64)
 
     js = [0, 1, 2]
-    J = 2
+    J = 4
     L = 3
 
     print("let's scatter. Shape of input is {}.".format(single_sample.shape))
     S = scattering_transform(single_sample, js, J, L)
 
+    print(S)
     print(S.shape)

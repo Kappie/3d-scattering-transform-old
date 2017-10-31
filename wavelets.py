@@ -38,8 +38,6 @@ def centered_array(size):
     return np.arange(size, dtype=np.float) - size // 2
 
 
-
-
 def filter_bank(width, height, depth, js, J, L):
     """
     js: length scales for filters. Filters will be dilated by 2**j for j in js.

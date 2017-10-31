@@ -1,0 +1,87 @@
+
+A circular convolution can be computed as a direct product in fourier space, as follows
+
+    from scipy.fftpack import fftn, ifftn
+
+    def convolution_cpu(a, b):
+        a_fourier = fftn(a)
+        b_fourier = fftn(b)
+        return ifftn(a_fourier*b_fourier)
+
+I this on GPU using [Pyculib](http://pyculib.readthedocs.io/en/latest/) as follows
+
+    import pyculib.fft
+
+    def convolution_gpu(a, b):
+        n_elements = np.prod(a.shape).astype(np.complex64)
+        convolution = np.empty(a.shape).astype(np.complex64)
+        a_fourier = np.empty(a.shape).astype(np.complex64)
+        b_fourier = np.empty(a.shape).astype(np.complex64)
+        pyculib.fft.fft(a, a_fourier)
+        pyculib.fft.fft(b, b_fourier)
+        a_fourier = a_fourier
+        pyculib.fft.ifft(a_fourier*b_fourier, convolution)
+        return convolution / n_elements
+
+cuFFT by design doesn't normalize, requiring me to manually divide the result by the number of elements. But here is where the trouble starts. At large 3D image sizes, results between the two function start to significantly deviate. Using the following helper functions
+
+    def print_absolute_differences_real_imag(a, b):
+        print("average absolute difference of real part")
+        print(np.average(np.abs(np.real(a - b))))
+        print("average absolute difference of imaginary part")
+        print(np.average(np.abs(np.imag(a - b))))
+
+
+    def generate_random_arrays(x, y, z, seed=0):
+        np.random.seed(seed)
+        a_real = np.random.rand(x, y, z).astype(np.complex64)
+        a_imag = np.random.rand(x, y, z).astype(np.complex64)
+        b_real = np.random.rand(x, y, z).astype(np.complex64)
+        b_imag = np.random.rand(x, y, z).astype(np.complex64)
+
+        return a_real + 1j*a_imag, b_real + 1j*b_imag
+
+
+
+I get
+
+    x = y = z = 4
+    a, b = generate_random_arrays(x, y, z)
+
+    cpu_result = convolution_cpu(a, b)
+    gpu_result = convolution_gpu_naive(a, b)
+
+    print_absolute_differences_real_imag(cpu_result, gpu_result)
+    # average absolute difference of real part
+    # 2.8885e-06
+    # average absolute difference of imaginary part
+    # 3.69549e-06
+
+But if my input random arrays of realistic sizes for my application
+
+    x = y = z = 128
+    a, b = generate_random_arrays(x, y, z)
+
+    cpu_result = convolution_cpu(a, b)
+    gpu_result = convolution_gpu_naive(a, b)
+
+    print_absolute_differences_real_imag(cpu_result, gpu_result)
+    # average absolute difference of real part
+    # 0.03125
+    # average absolute difference of imaginary part
+    # 0.0967712
+
+This problem persists no matter where attempt to normalize the output of result in `convolution_gpu`.
+
+The problem is in the multiplication in fourier space, for the following functions are not affected by dimension, giving average deviations of `10e-7` independent of input size.
+
+    def identity_cpu(a):
+        return ifftn(fftn(a))
+
+
+    def identity_gpu(a):
+        a_fourier = np.empty_like(a)
+        result = np.empty_like(a)
+        pyculib.fft.fft(a, a_fourier)
+        pyculib.fft.ifft(a_fourier, result)
+        return result / np.prod(a.shape)
