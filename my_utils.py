@@ -1,13 +1,14 @@
 import numpy as np
 import pyculib.fft
+from numba import cuda, vectorize
 
 
-@numba.vectorize(['complex64(complex64, complex64)'], target='cuda')
+@vectorize(['complex64(complex64, complex64)'], target='cuda')
 def Multiply(a, b):
     return a * b
 
 
-@numba.vectorize(['complex64(complex64, complex64)'], target='cuda')
+@vectorize(['float32(complex64)'], target='cuda')
 def Modulus(x):
     return abs(x)
 
@@ -20,9 +21,10 @@ def fourier(signal):
 
 
 def inverse_fourier(signal_fourier):
+    n_elements = np.prod(signal_fourier.shape)
     signal = np.empty_like(signal_fourier)
     pyculib.fft.ifft(signal_fourier, signal)
-    return signal
+    return signal / n_elements
 
 
 def crop_freq_3d(x, res):
@@ -52,5 +54,6 @@ def modulus_after_inverse_fourier(signal):
 
     pyculib.fft.fft(signal_gpu, signal_inverse_fourier)
     modulus = Modulus(signal_inverse_fourier)
+    modulus = modulus.copy_to_host()
 
     return modulus / n_elements

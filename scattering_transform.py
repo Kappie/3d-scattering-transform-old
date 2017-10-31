@@ -5,7 +5,7 @@ import time
 from plot_slices import plot3d
 
 from wavelets import filter_bank
-from my_utils import fourier, inverse_fourier, crop_freq_3d
+from my_utils import fourier, inverse_fourier, crop_freq_3d, Multiply, Modulus, modulus_after_inverse_fourier
 
 
 def scattering_transform(X, js, J, L):
@@ -35,8 +35,9 @@ def scattering_transform(X, js, J, L):
     zeroth_order_coefficients_fourier = Multiply(X_fourier, phis[0])
     # Downsample by factor 2**J
     zeroth_order_coefficients_fourier = crop_freq_3d(zeroth_order_coefficients_fourier, J)
-    # Transform back to real space.
-    zeroth_order_coefficients = np.abs( inverse_fourier(zeroth_order_coefficients_fourier) )
+    # Transform back to real space and take modulus.
+    # zeroth_order_coefficients = np.abs( inverse_fourier(zeroth_order_coefficients_fourier) )
+    zeroth_order_coefficients = modulus_after_inverse_fourier(zeroth_order_coefficients_fourier)
     scattering_coefficients.append(zeroth_order_coefficients)
 
     for n1 in range(len(psis)):
@@ -44,13 +45,15 @@ def scattering_transform(X, js, J, L):
 
         # Calculate wavelet transform and apply modulus. Signal can be downsampled at 2**j1 without losing much energy.
         # See Bruna (2013).
-        transform1 = np.abs(inverse_fourier( crop_freq_3d( X_fourier * psis[n1][0], j1 ) ))
+        downsampled_convolution = crop_freq_3d( Multiply(X_fourier, psis[n1][0]), j1 )
+        transform1 = modulus_after_inverse_fourier(downsampled_convolution).astype(np.complex64)
         transform1_fourier = fourier(transform1)
 
         # Second low-pass filter: Extract first order coefficients.
         # The transform is already downsampled by 2**j1, so we take the version of phi that is downsampled by the same
         # factor. The scattering coefficients itself can be sampled at 2**J, so a downsampling of 2**(J - j1) remains.
-        first_order_coefficients = np.abs(inverse_fourier( crop_freq_3d(transform1_fourier * phis[j1], J - j1) ))
+        first_order_coefficients = crop_freq_3d( Multiply(transform1_fourier, phis[j1]), J - j1 )
+        first_order_coefficients = modulus_after_inverse_fourier(first_order_coefficients)
         scattering_coefficients.append(first_order_coefficients)
 
         for n2 in range(len(psis)):
@@ -59,14 +62,16 @@ def scattering_transform(X, js, J, L):
                 # # transform1 is already downsampled at 2**j1, so we take the wavelet that is downsampled at the same
                 # # factor.
                 # # We can downsample transform2 at 2**j2, so here it remains to downsample with the factor 2**(j2-j1).
-                transform2 = np.abs(inverse_fourier( crop_freq_3d( transform1_fourier * psis[n2][j1], j2 - j1 ) ))
+                downsampled_convolution = crop_freq_3d( Multiply(transform1_fourier, psis[n2][j1]), j2 - j1 )
+                transform2 = modulus_after_inverse_fourier(downsampled_convolution).astype(np.complex64)
                 transform2_fourier = fourier(transform2)
 
                 # Third low-pass filter. Extract second-order coefficients.
                 # The transform is already downsampled by 2**j2, so we take the version of phi that is downsampled by
                 # the same factor. The scattering coefficients itself can be sampled at 2**J, so a downsampling of
                 # 2**(J - j2) remains.
-                second_order_coefficients = np.abs(inverse_fourier( crop_freq_3d(transform2_fourier * phis[j2], J - j2) ))
+                second_order_coefficients = crop_freq_3d( Multiply(transform2_fourier, phis[j2]), J - j2 )
+                second_order_coefficients = modulus_after_inverse_fourier(second_order_coefficients)
                 scattering_coefficients.append(second_order_coefficients)
 
     scattering_coefficients = np.array(scattering_coefficients)
