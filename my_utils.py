@@ -3,7 +3,7 @@ import pyculib.fft
 from numba import cuda, vectorize
 
 
-@vectorize(['complex64(complex64, complex64)'], target='cuda')
+@vectorize(['complex64(complex64, complex64)', 'float32(float32, int32)', 'float32(float32, float32)'], target='cuda')
 def Multiply(a, b):
     return a * b
 

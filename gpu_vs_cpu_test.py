@@ -85,20 +85,21 @@ def generate_random_arrays(x, y, z, seed=0):
     return a_real + 1j*a_imag, b_real + 1j*b_imag
 
 
-x = y = z = 256
-a, b = generate_random_arrays(x, y, z)
+if __name__ == '__main__':
+    x = y = z = 256
+    a, b = generate_random_arrays(x, y, z)
 
-print("Size of input: {}".format(a.shape))
-print("Compilation runs")
-convolution_gpu_naive(a, b)
-convolution_gpu(a, b)
-convolution_gpu_inplace(a, b)
-a, b = generate_random_arrays(x, y, z)
-convolution_cpu(a, b)
-print("done.")
-print("Real comparison single run:")
-convolution_gpu_naive(a, b)
-convolution_gpu(a, b)
-convolution_gpu_inplace(a, b)
-a, b = generate_random_arrays(x, y, z)
-convolution_cpu(a, b)
+    print("Size of input: {}".format(a.shape))
+    print("Compilation runs")
+    convolution_gpu_naive(a, b)
+    convolution_gpu(a, b)
+    convolution_gpu_inplace(a, b)
+    a, b = generate_random_arrays(x, y, z)
+    convolution_cpu(a, b)
+    print("done.")
+    print("Real comparison single run:")
+    convolution_gpu_naive(a, b)
+    convolution_gpu(a, b)
+    convolution_gpu_inplace(a, b)
+    a, b = generate_random_arrays(x, y, z)
+    convolution_cpu(a, b)
