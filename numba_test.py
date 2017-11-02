@@ -4,22 +4,7 @@ import pyculib.fft
 import numba
 from numba import cuda
 from scipy.fftpack import fftn, ifftn
-
-
-@numba.vectorize(['complex64(complex64, complex64)'], target='cuda')
-def Multiply(a, b):
-    return a * b
-
-
-def time_me(f):
-    def wrapper(*args):
-        start = time.time()
-        result = f(*args)
-        end = time.time()
-        print("{} took {} seconds".format(f.__name__, str(end - start)))
-        return result
-
-    return wrapper
+from my_utils import Multiply
 
 
 def convolution_cpu(a, b):
@@ -92,39 +77,9 @@ def print_absolute_rel_differences_real_imag(a, b):
     print(np.average(np.abs(np.imag(a - b)) / np.imag(a)))
 
 
-
-
-# @numba.cuda.jit
-# def multiply(A, B, C):
-#     """
-#     Perform element wise multiplication of C = A * B
-#     """
-#     i, j, k = numba.cuda.grid(3)
-#     C[i, j, k] = A[i, j, k] * B[i, j, k]
-
-
-x = y = z = 200
+x = y = 128
+z = 256
 a, b = generate_random_arrays(x, y, z)
-delta = np.zeros((x, y, z), dtype=np.complex64)
-delta[0, 0, 0] = 1.
-all_ones = np.ones((x, y, z), dtype=np.complex64)
 
-
-# cpu_result = identity_cpu(a)
-# gpu_result = identity_gpu(a)
-
-cpu_result = convolution_cpu(a, all_ones)
-gpu_result = convolution_gpu_naive(a, all_ones)
-sum_a = np.sum(a)
-
-print("cpu: ")
-print_absolute_rel_differences_real_imag(cpu_result, sum_a)
-print("gpu: ")
-print_absolute_rel_differences_real_imag(gpu_result, sum_a)
-print("difference between gpu and cpu")
-print_absolute_rel_differences_real_imag(gpu_result, cpu_result)
-
-# print("cpu result")
-# print_absolute_differences_real_imag(cpu_result, actual_result)
-# print("gpu result")
-# print_absolute_differences_real_imag(gpu_result, actual_result)
+# compilation run
+gpu_result = Multiply(a, b)

@@ -47,6 +47,32 @@ def crop_freq_3d(x, res):
     return x[indices]
 
 
+@cuda.jit()
+def crop_freq_3d_gpu(signal_fourier, result):
+    """
+    Result needs to be the correct size, i.e.
+    (original_width // 2**res, original_height // 2**res, original_depth // 2**res)
+    """
+    x, y, z = cuda.grid(3)
+    width, height, depth = result.shape
+    if x < (width // 2):
+        i = x
+    elif x < width:
+        i = -width + x
+
+    if y < (height // 2):
+        j = y
+    elif y < height:
+        j = -height + y
+
+    if z < (depth // 2):
+        k = z
+    elif z < depth:
+        k = -depth + z
+
+    result[x, y, z] = signal_fourier[i, j, k]
+
+
 def modulus_after_inverse_fourier(signal):
     n_elements = np.prod(signal.shape)
     signal_gpu = cuda.to_device(signal)

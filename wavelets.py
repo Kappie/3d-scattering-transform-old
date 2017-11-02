@@ -1,43 +1,55 @@
 import numpy as np
 import tensorflow as tf
 import scipy.signal
+import math
+import cmath
+import time
 from transforms3d.euler import euler2mat
 from cube_show_slider import cube_show_slider
 from itertools import product
-from numba import cuda, vectorize
+from numba import cuda, vectorize, jit
 from gpu_vs_cpu_test import time_me
 
 from my_utils import crop_freq_3d, fourier
 
 
-def gabor_filter(width, height, depth, j, alpha, beta, gamma, xi=np.array([3*np.pi/4, 0, 0]), a=2, sigma=1):
-    """
-    Outputs gabor filter of shape `dimensions`.
-    """
-    x = centered_array(width)
-    y = centered_array(height)
-    z = centered_array(depth)
-    xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
-    # Apply rotation matrix to coordinates and scale by a**j.
+XI_DEFAULT = np.array([3*np.pi/4, 0, 0])
+A_DEFAULT = 2
+SIGMA_DEFAULT = 1.
+
+
+def gabor_filter(width, height, depth, j, alpha, beta, gamma, xi=XI_DEFAULT, a=A_DEFAULT, sigma=SIGMA_DEFAULT):
     R = euler2mat(alpha, beta, gamma, 'sxyz')
-    xx_prime = (R[0, 0]*xx + R[0, 1]*yy + R[0, 2]*zz) / a**j
-    yy_prime = (R[1, 0]*xx + R[1, 1]*yy + R[1, 2]*zz) / a**j
-    zz_prime = (R[2, 0]*xx + R[2, 1]*yy + R[2, 2]*zz) / a**j
-    # Apply gabor function and multiply by 1 / (a**j * sigma), as in the original
-    # definition of scaled and rotated wavelet. (See e.g. Adel et al 2016.)
-    gab_filter = (1/(a**j * sigma)) * np.exp(-(xx_prime**2 + yy_prime**2 + zz_prime**2)/(2*sigma**2) + 1j*(xx_prime*xi[0] + yy_prime*xi[1] + zz_prime*xi[2]))
-    return gab_filter
+    result = np.empty((width, height, depth), dtype=np.complex64)
+    gabor_filter_compiled(width, height, depth, j, R, xi, a, sigma, result)
+    return result
 
 
-def gaussian_filter(width, height, depth, J):
-    return np.real( gabor_filter(width, height, depth, J, 0, 0, 0, xi=np.array([0, 0, 0])) )
+def gaussian_filter(width, height, depth, J, a=A_DEFAULT, sigma=SIGMA_DEFAULT):
+    result = np.empty((width, height, depth), dtype=np.float32)
+    gaussian_filter_compiled(width, height, depth, J, a, sigma, result)
+    return result
 
 
-def centered_array(size):
-    """
-    Returns [-size//2, ..., -2, -1, 0, 1, 2, ..., size//2]
-    """
-    return np.arange(size, dtype=np.float) - size // 2
+@jit(['void(int64, int64, int64, int64, float64[:, :], float64[:], int64, float64, complex64[:, :, :])'], nopython=True)
+def gabor_filter_compiled(width, height, depth, j, R, xi, a, sigma, result):
+    scale_factor = 1/(sigma*a**j)
+    for x in range(width):
+        for y in range(height):
+            for z in range(depth):
+                x_prime = (R[0, 0]*x + R[0, 1]*y + R[0, 2]*z) * scale_factor
+                y_prime = (R[1, 0]*x + R[1, 1]*y + R[1, 2]*z) * scale_factor
+                z_prime = (R[2, 0]*x + R[2, 1]*y + R[2, 2]*z) * scale_factor
+                result[x, y, z] = scale_factor * cmath.exp(-(x_prime**2 + y_prime**2 + z_prime**2)/2 + 1j*sigma*(x_prime*xi[0] + y_prime*xi[1] + z_prime*xi[2]))
+
+
+@jit(['void(int64, int64, int64, int64, int64, float64, float32[:, :, :])'], nopython=True)
+def gaussian_filter_compiled(width, height, depth, j, a, sigma, result):
+    scale_factor = 1/(sigma*a**j)
+    for x in range(width):
+        for y in range(height):
+            for z in range(depth):
+                result[x, y, z] = scale_factor * math.exp(-(x**2 + y**2 + z**2)*scale_factor/2)
 
 
 def filter_bank(width, height, depth, js, J, L):
@@ -76,18 +88,15 @@ def filter_bank(width, height, depth, js, J, L):
     return filters
 
 
-def normalize(signal, width, height, depth, j):
-    return signal / (width * height * depth // 2**(2*j))
-
-
 if __name__ == '__main__':
-    y = 128
-    x = z = 64
-    js = [0, 1, 2]
+    y = 256
+    x = z = 128
+    js = [0, 1, 2, 3]
     J = 3
-    L = 3
+    L = 4
 
     start = time.time()
     filters = filter_bank(x, y, z, js, J, L)
     end = time.time()
+    print(len(filters['psi']))
     print(end - start)
