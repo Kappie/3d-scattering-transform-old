@@ -1,27 +1,56 @@
 import numpy as np
 import pyculib.fft
 from numba import cuda, vectorize
+import scipy.fftpack
+import time
+import math
+
+# @vectorize(['complex64(complex64, complex64)', 'float32(float32, int32)', 'float32(float32, float32)'], target='cuda')
+# def Multiply(a, b):
+#     return a * b
+#
+#
+# @vectorize(['float32(complex64)'], target='cuda')
+# def Modulus(x):
+#     return abs(x)
 
 
-@vectorize(['complex64(complex64, complex64)', 'float32(float32, int32)', 'float32(float32, float32)'], target='cuda')
-def Multiply(a, b):
-    return a * b
-
-
-@vectorize(['float32(complex64)'], target='cuda')
-def Modulus(x):
-    return abs(x)
-
-
-def extract_scattering_coefficients(X_fourier, filter_fourier, downsampling_resolution):
-    x, y, z = X_fourier.shape
-    result_full_scale = cuda.device_array_like(X_fourier)
-    X_fourier_gpu = cuda.to_device(X_fourier)
+def extract_scattering_coefficients(X, filter_fourier, downsampling_resolution):
+    x, y, z = X.shape
+    X_gpu = cuda.to_device(X)
     filter_fourier_gpu = cuda.to_device(filter_fourier)
+    result_full_scale = cuda.device_array_like(X)
     result = cuda.device_array((x//2**downsampling_resolution, y//2**downsampling_resolution, z//2**downsampling_resolution), dtype=np.complex64)
 
-    result_full_scale = Multiply(X_fourier_gpu, filter_fourier_gpu)
-    print(result_full_scale)
+    # Fourier transform X
+    pyculib.fft.fft_inplace(X_gpu)
+    X_fourier = X_gpu
+    # Multiply in Fourier space
+    blockspergrid, threadsperblock = get_blocks_and_threads(x, y, z)
+    MultiplyInPlace[blockspergrid, threadsperblock](X_fourier, filter_fourier_gpu)
+    result_multiplication = X_fourier
+
+    # Downsample in Fourier space by cropping the highest frequencies (resolution is inferred by shape of `result`.)
+    blockspergrid, threadsperblock = get_blocks_and_threads(result.shape[0], result.shape[1], result.shape[2])
+    crop_freq_3d_gpu[blockspergrid, threadsperblock](result_multiplication, result)
+    # Transform to real space
+    pyculib.fft.ifft_inplace(result)
+    # Take absolute value
+    ModulusInPlace[blockspergrid, threadsperblock](result)
+    result = result.copy_to_host()
+    n_elements = np.prod(result.shape)
+    # normalise inverse fourier transformation
+    return result / n_elements
+
+
+def extract_scattering_coefficients_cpu(X, filter_fourier, downsampling_resolution):
+    # Fourier transform X
+    X_fourier = scipy.fftpack.fftn(X)
+    # First low-pass filter: Extract zeroth order coefficients
+    downsampled_product = crop_freq_3d( X_fourier * filter_fourier, downsampling_resolution )
+    # Transform back to real space and take modulus.
+    result = np.abs( scipy.fftpack.ifftn(downsampled_product) )
+    return result
 
 
 def fourier(signal):
@@ -84,6 +113,37 @@ def crop_freq_3d_gpu(signal_fourier, result):
     result[x, y, z] = signal_fourier[i, j, k]
 
 
+@cuda.jit()
+def MultiplyInPlace(A, B):
+    """
+    Result is saved in A
+    """
+    x, y, z = cuda.grid(3)
+    if x < A.shape[0] and y < A.shape[1] and z < A.shape[2]:
+        A[x, y, z] = A[x, y, z] * B[x, y, z]
+
+
+@cuda.jit()
+def ModulusInPlace(A):
+    x, y, z = cuda.grid(3)
+    if x < A.shape[0] and y < A.shape[1] and z < A.shape[2]:
+        A[x, y, z] = abs(A[x, y, z])
+
+
+def get_blocks_and_threads(x, y, z):
+    if x < 8 or y < 8 or z < 8:
+        threadsperblock = (x, y, z)
+    else:
+        threadsperblock = (8, 8, 8)
+
+    blockspergrid_x = math.ceil(x / threadsperblock[0])
+    blockspergrid_y = math.ceil(y / threadsperblock[1])
+    blockspergrid_z = math.ceil(z / threadsperblock[2])
+    blockspergrid = (blockspergrid_x, blockspergrid_y, blockspergrid_z)
+
+    return blockspergrid, threadsperblock
+
+
 def modulus_after_inverse_fourier(signal):
     n_elements = np.prod(signal.shape)
     signal_gpu = cuda.to_device(signal)
@@ -94,3 +154,11 @@ def modulus_after_inverse_fourier(signal):
     modulus = modulus.copy_to_host()
 
     return modulus / n_elements
+
+
+def time_me(f, *args):
+    start = time.time()
+    result = f(*args)
+    end = time.time()
+    print("function took {} seconds.".format(str(end-start)))
+    return result
