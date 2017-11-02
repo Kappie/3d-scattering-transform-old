@@ -13,6 +13,17 @@ def Modulus(x):
     return abs(x)
 
 
+def extract_scattering_coefficients(X_fourier, filter_fourier, downsampling_resolution):
+    x, y, z = X_fourier.shape
+    result_full_scale = cuda.device_array_like(X_fourier)
+    X_fourier_gpu = cuda.to_device(X_fourier)
+    filter_fourier_gpu = cuda.to_device(filter_fourier)
+    result = cuda.device_array((x//2**downsampling_resolution, y//2**downsampling_resolution, z//2**downsampling_resolution), dtype=np.complex64)
+
+    result_full_scale = Multiply(X_fourier_gpu, filter_fourier_gpu)
+    print(result_full_scale)
+
+
 def fourier(signal):
     signal = signal.astype(np.complex64)
     signal_fourier = np.empty_like(signal)
