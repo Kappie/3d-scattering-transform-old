@@ -5,15 +5,6 @@ import scipy.fftpack
 import time
 import math
 
-# @vectorize(['complex64(complex64, complex64)', 'float32(float32, int32)', 'float32(float32, float32)'], target='cuda')
-# def Multiply(a, b):
-#     return a * b
-#
-#
-# @vectorize(['float32(complex64)'], target='cuda')
-# def Modulus(x):
-#     return abs(x)
-
 
 def extract_scattering_coefficients(X, filter_fourier, downsampling_resolution):
     x, y, z = X.shape
@@ -162,3 +153,10 @@ def time_me(f, *args):
     end = time.time()
     print("function took {} seconds.".format(str(end-start)))
     return result
+
+
+def downsample(X, res, a):
+    """
+    Downsampling in real space.
+    """
+    return X[::a**res, ::a**res, ::a**res]
