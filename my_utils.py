@@ -6,10 +6,13 @@ import time
 import math
 
 
-def extract_scattering_coefficients(X, filter_fourier, downsampling_resolution):
+def extract_scattering_coefficients(X, phi, downsampling_resolution):
+    """
+    Phi is already in fourier space. calculate | x \conv filter | downsampled at 2**downsampling_resolution.
+    """
     x, y, z = X.shape
     X_gpu = cuda.to_device(X)
-    filter_fourier_gpu = cuda.to_device(filter_fourier)
+    phi_gpu = cuda.to_device(phi)
     result_full_scale = cuda.device_array_like(X)
     result = cuda.device_array((x//2**downsampling_resolution, y//2**downsampling_resolution, z//2**downsampling_resolution), dtype=np.complex64)
 
@@ -18,7 +21,7 @@ def extract_scattering_coefficients(X, filter_fourier, downsampling_resolution):
     X_fourier = X_gpu
     # Multiply in Fourier space
     blockspergrid, threadsperblock = get_blocks_and_threads(x, y, z)
-    MultiplyInPlace[blockspergrid, threadsperblock](X_fourier, filter_fourier_gpu)
+    MultiplyInPlace[blockspergrid, threadsperblock](X_fourier, phi_gpu)
     result_multiplication = X_fourier
 
     # Downsample in Fourier space by cropping the highest frequencies (resolution is inferred by shape of `result`.)
@@ -34,28 +37,65 @@ def extract_scattering_coefficients(X, filter_fourier, downsampling_resolution):
     return result / n_elements
 
 
-def extract_scattering_coefficients_cpu(X, filter_fourier, downsampling_resolution):
+def extract_scattering_coefficients_cpu(X, phi, downsampling_resolution):
+    """
+    Phi is already in fourier space. calculate | x \conv filter | downsampled at 2**downsampling_resolution.
+    """
     # Fourier transform X
     X_fourier = scipy.fftpack.fftn(X)
     # First low-pass filter: Extract zeroth order coefficients
-    downsampled_product = crop_freq_3d( X_fourier * filter_fourier, downsampling_resolution )
+    downsampled_product = crop_freq_3d( X_fourier * phi, downsampling_resolution )
     # Transform back to real space and take modulus.
     result = np.abs( scipy.fftpack.ifftn(downsampled_product) )
     return result
 
 
-def fourier(signal):
-    signal = signal.astype(np.complex64)
-    signal_fourier = np.empty_like(signal)
-    pyculib.fft.fft(signal, signal_fourier)
-    return signal_fourier
+def abs_after_convolve(A, B, downsampling_resolution):
+    """
+    A and B are both in real space. Calculate | A \conv B |.
+    """
+    x, y, z = A.shape
+    A_gpu = cuda.to_device(A)
+    B_gpu = cuda.to_device(B)
+    result_full_scale = cuda.device_array_like(A)
+    result = cuda.device_array((x//2**downsampling_resolution, y//2**downsampling_resolution, z//2**downsampling_resolution), dtype=np.complex64)
+
+    # Fourier transform X
+    pyculib.fft.fft_inplace(A_gpu)
+    A_fourier = A_gpu
+    pyculib.fft.fft_inplace(B_gpu)
+    B_fourier = B_gpu
+
+    # Multiply in Fourier space
+    blockspergrid, threadsperblock = get_blocks_and_threads(x, y, z)
+    MultiplyInPlace[blockspergrid, threadsperblock](A_fourier, B_fourier)
+    result_multiplication = A_fourier
+
+    # Downsample in Fourier space by cropping the highest frequencies (resolution is inferred by shape of `result`.)
+    blockspergrid, threadsperblock = get_blocks_and_threads(result.shape[0], result.shape[1], result.shape[2])
+    crop_freq_3d_gpu[blockspergrid, threadsperblock](result_multiplication, result)
+    # Transform to real space
+    pyculib.fft.ifft_inplace(result)
+    # Take absolute value
+    ModulusInPlace[blockspergrid, threadsperblock](result)
+    result = result.copy_to_host()
+    n_elements = np.prod(result.shape)
+    # normalise inverse fourier transformation
+    return (result / n_elements).astype(np.complex64)
 
 
-def inverse_fourier(signal_fourier):
-    n_elements = np.prod(signal_fourier.shape)
-    signal = np.empty_like(signal_fourier)
-    pyculib.fft.ifft(signal_fourier, signal)
-    return signal / n_elements
+# def fourier(signal):
+#     signal = signal.astype(np.complex64)
+#     signal_fourier = np.empty_like(signal)
+#     pyculib.fft.fft(signal, signal_fourier)
+#     return signal_fourier
+#
+#
+# def inverse_fourier(signal_fourier):
+#     n_elements = np.prod(signal_fourier.shape)
+#     signal = np.empty_like(signal_fourier)
+#     pyculib.fft.ifft(signal_fourier, signal)
+#     return signal / n_elements
 
 
 def crop_freq_3d(x, res):
@@ -135,16 +175,16 @@ def get_blocks_and_threads(x, y, z):
     return blockspergrid, threadsperblock
 
 
-def modulus_after_inverse_fourier(signal):
-    n_elements = np.prod(signal.shape)
-    signal_gpu = cuda.to_device(signal)
-    signal_inverse_fourier = cuda.device_array_like(signal)
-
-    pyculib.fft.fft(signal_gpu, signal_inverse_fourier)
-    modulus = Modulus(signal_inverse_fourier)
-    modulus = modulus.copy_to_host()
-
-    return modulus / n_elements
+# def modulus_after_inverse_fourier(signal):
+#     n_elements = np.prod(signal.shape)
+#     signal_gpu = cuda.to_device(signal)
+#     signal_inverse_fourier = cuda.device_array_like(signal)
+#
+#     pyculib.fft.fft(signal_gpu, signal_inverse_fourier)
+#     modulus = Modulus(signal_inverse_fourier)
+#     modulus = modulus.copy_to_host()
+#
+#     return modulus / n_elements
 
 
 def time_me(f, *args):
@@ -155,8 +195,8 @@ def time_me(f, *args):
     return result
 
 
-def downsample(X, res, a):
+def downsample(X, res):
     """
     Downsampling in real space.
     """
-    return X[::a**res, ::a**res, ::a**res]
+    return np.ascontiguousarray(X[::2**res, ::2**res, ::2**res])

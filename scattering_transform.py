@@ -5,7 +5,7 @@ import time
 from plot_slices import plot3d
 
 from wavelets import filter_bank
-from my_utils import fourier, inverse_fourier, crop_freq_3d, Multiply, Modulus, modulus_after_inverse_fourier
+from my_utils import abs_after_convolve, extract_scattering_coefficients
 
 
 def scattering_transform(X, js, J, L):
@@ -20,6 +20,7 @@ def scattering_transform(X, js, J, L):
     """
 
     width, height, depth = X.shape
+    X = X.astype(np.complex64)
     print("building filter bank...")
     start = time.time()
     filters = filter_bank(width, height, depth, js, J, L)
@@ -30,15 +31,9 @@ def scattering_transform(X, js, J, L):
     phis = filters['phi']
     scattering_coefficients = []
     transforms = []
-    X_fourier = fourier(X)
 
     # First low-pass filter: Extract zeroth order coefficients
-    zeroth_order_coefficients_fourier = X_fourier * phis[0]
-    # Downsample by factor 2**J
-    zeroth_order_coefficients_fourier = crop_freq_3d(zeroth_order_coefficients_fourier, J)
-    # Transform back to real space and take modulus.
-    # zeroth_order_coefficients = np.abs( inverse_fourier(zeroth_order_coefficients_fourier) )
-    zeroth_order_coefficients = modulus_after_inverse_fourier(zeroth_order_coefficients_fourier)
+    zeroth_order_coefficients = extract_scattering_coefficients(X, phis[0], J)
     scattering_coefficients.append(zeroth_order_coefficients)
 
     for n1 in range(len(psis)):
@@ -46,33 +41,27 @@ def scattering_transform(X, js, J, L):
 
         # Calculate wavelet transform and apply modulus. Signal can be downsampled at 2**j1 without losing much energy.
         # See Bruna (2013).
-        downsampled_convolution = crop_freq_3d( X_fourier * psis[n1][0], j1 )
-        transform1 = modulus_after_inverse_fourier(downsampled_convolution).astype(np.complex64)
-        transform1_fourier = fourier(transform1)
+        transform1 = abs_after_convolve(X, psis[n1][0], j1)
 
         # Second low-pass filter: Extract first order coefficients.
         # The transform is already downsampled by 2**j1, so we take the version of phi that is downsampled by the same
         # factor. The scattering coefficients itself can be sampled at 2**J, so a downsampling of 2**(J - j1) remains.
-        first_order_coefficients = crop_freq_3d( transform1_fourier * phis[j1], J - j1 )
-        first_order_coefficients = modulus_after_inverse_fourier(first_order_coefficients)
+        first_order_coefficients = extract_scattering_coefficients(transform1, phis[j1], J - j1)
         scattering_coefficients.append(first_order_coefficients)
 
         for n2 in range(len(psis)):
             j2 = psis[n2]['j']
             if j1 < j2:
-                # # transform1 is already downsampled at 2**j1, so we take the wavelet that is downsampled at the same
-                # # factor.
-                # # We can downsample transform2 at 2**j2, so here it remains to downsample with the factor 2**(j2-j1).
-                downsampled_convolution = crop_freq_3d( transform1_fourier * psis[n2][j1], j2 - j1 )
-                transform2 = modulus_after_inverse_fourier(downsampled_convolution).astype(np.complex64)
-                transform2_fourier = fourier(transform2)
+                # transform1 is already downsampled at 2**j1, so we take the wavelet that is downsampled at the same
+                # factor.
+                # We can downsample transform2 at 2**j2, so here it remains to downsample with the factor 2**(j2-j1).
+                transform2 = abs_after_convolve(transform1, psis[n2][j1], j2 - j1)
 
                 # Third low-pass filter. Extract second-order coefficients.
                 # The transform is already downsampled by 2**j2, so we take the version of phi that is downsampled by
                 # the same factor. The scattering coefficients itself can be sampled at 2**J, so a downsampling of
                 # 2**(J - j2) remains.
-                second_order_coefficients = crop_freq_3d( transform2_fourier * phis[j2], J - j2 )
-                second_order_coefficients = modulus_after_inverse_fourier(second_order_coefficients)
+                second_order_coefficients = extract_scattering_coefficients(transform2, phis[j2], J - j2)
                 scattering_coefficients.append(second_order_coefficients)
 
     scattering_coefficients = np.array(scattering_coefficients)
@@ -83,8 +72,8 @@ def scattering_transform(X, js, J, L):
 
 if __name__ == '__main__':
     js = [0, 1, 2]
-    J = 2
-    L = 2
+    J = 3
+    L = 4
     x = y = 128
     z = 256
     X = np.random.rand(x, y, z)
