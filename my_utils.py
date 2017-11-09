@@ -34,7 +34,7 @@ def extract_scattering_coefficients(X, phi, downsampling_resolution):
     result = result.copy_to_host()
     n_elements = np.prod(result.shape)
     # normalise inverse fourier transformation
-    return result / n_elements
+    return (result / n_elements).real.astype(np.float32)
 
 
 def extract_scattering_coefficients_cpu(X, phi, downsampling_resolution):

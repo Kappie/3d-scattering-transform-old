@@ -105,7 +105,7 @@ def gaussian_filter_gpu(width, height, depth, j, a, sigma, result):
         result[x, y, z] = normalization * math.exp(-(x_prime**2 + y_prime**2 + z_prime**2)*scale_factor/(2*sigma**2))
 
 
-def filter_bank(width, height, depth, js, J, L):
+def filter_bank(width, height, depth, js, J, L, sigma):
     """
     js: length scales for filters. Filters will be dilated by 2**j for j in js.
     J: length scale used for averaging over scattered signals. (coefficients will be approximately translationally
@@ -122,7 +122,7 @@ def filter_bank(width, height, depth, js, J, L):
 
     for j, alpha, beta, gamma in product(js, alphas, betas, gammas):
         psi = {'j': j, 'alpha': alpha, 'beta': beta, 'gamma': gamma}
-        psi_signal = get_gabor_filter_gpu(width, height, depth, j, alpha, beta, gamma)
+        psi_signal = get_gabor_filter_gpu(width, height, depth, j, alpha, beta, gamma, sigma=sigma)
         # When j_1 < j_2 < ... < j_n, we need j_2, ..., j_n downsampled at j_1, j_3, ..., j_n downsampled at j_2, etc.
         # resolution 0 is just the signal itself. See below header "Fast scattering computation" in Bruna (2013).
         for resolution in range(j + 1):
@@ -132,7 +132,7 @@ def filter_bank(width, height, depth, js, J, L):
         filters['psi'].append(psi)
 
     filters['phi'] = {}
-    phi_signal = get_gaussian_filter_gpu(width, height, depth, J)
+    phi_signal = get_gaussian_filter_gpu(width, height, depth, J, sigma=sigma)
     phi_signal_fourier = scipy.fftpack.fftn(phi_signal)
     filters['phi']['j'] = J
     # We need the phi signal downsampled at all length scales j.
