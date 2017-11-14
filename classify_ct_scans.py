@@ -58,6 +58,8 @@ def classify(dataset, labels):
     # print(classification_report(y_true, y_pred))
     print()
 
+    return classifier
+
 
 
 def normalize(dataset):

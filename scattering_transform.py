@@ -54,7 +54,7 @@ def scattering_transform(X, J, filters):
     Return scattering coefficients in format: (n_transforms, width//2**J, height//2**J, depth//2**J)
     """
 
-    save_transform_to_disk(X, {})
+    # save_transform_to_disk(X, {})
     X = X.astype(np.complex64)
     psis = filters['psi']
     phis = filters['phi']
@@ -63,7 +63,7 @@ def scattering_transform(X, J, filters):
 
     # First low-pass filter: Extract zeroth order coefficients
     zeroth_order_coefficients = extract_scattering_coefficients(X, phis[0], J)
-    save_transform_to_disk(zeroth_order_coefficients, {'J': J})
+    # save_transform_to_disk(zeroth_order_coefficients, {'J': J})
     scattering_coefficients.append(zeroth_order_coefficients)
 
     for n1 in range(len(psis)):
@@ -73,13 +73,13 @@ def scattering_transform(X, J, filters):
         # Calculate wavelet transform and apply modulus. Signal can be downsampled at 2**j1 without losing much energy.
         # See Bruna (2013).
         transform1 = abs_after_convolve(X, psis[n1][0], j1)
-        save_transform_to_disk(transform1.astype(np.float32), {'j1': j1, 'alpha': alpha1, 'beta': beta1, 'gamma': gamma1})
+        # save_transform_to_disk(transform1.astype(np.float32), {'j1': j1, 'alpha': alpha1, 'beta': beta1, 'gamma': gamma1})
 
         # Second low-pass filter: Extract first order coefficients.
         # The transform is already downsampled by 2**j1, so we take the version of phi that is downsampled by the same
         # factor. The scattering coefficients itself can be sampled at 2**J, so a downsampling of 2**(J - j1) remains.
         first_order_coefficients = extract_scattering_coefficients(transform1, phis[j1], J - j1)
-        save_transform_to_disk(first_order_coefficients, {'j1': j1, 'alpha': alpha1, 'beta': beta1, 'gamma': gamma1, 'J': J})
+        # save_transform_to_disk(first_order_coefficients, {'j1': j1, 'alpha': alpha1, 'beta': beta1, 'gamma': gamma1, 'J': J})
         scattering_coefficients.append(first_order_coefficients)
 
         for n2 in range(len(psis)):
@@ -90,14 +90,14 @@ def scattering_transform(X, J, filters):
                 # factor.
                 # We can downsample transform2 at 2**j2, so here it remains to downsample with the factor 2**(j2-j1).
                 transform2 = abs_after_convolve(transform1, psis[n2][j1], j2 - j1)
-                save_transform_to_disk(transform2.astype(np.float32), {'j1': j1, 'alpha': alpha1, 'beta': beta1, 'gamma': gamma1, 'j2': j2, 'alpha2': alpha2, 'beta2': beta2, 'gamma2': gamma2})
+                # save_transform_to_disk(transform2.astype(np.float32), {'j1': j1, 'alpha': alpha1, 'beta': beta1, 'gamma': gamma1, 'j2': j2, 'alpha2': alpha2, 'beta2': beta2, 'gamma2': gamma2})
 
                 # Third low-pass filter. Extract second-order coefficients.
                 # The transform is already downsampled by 2**j2, so we take the version of phi that is downsampled by
                 # the same factor. The scattering coefficients itself can be sampled at 2**J, so a downsampling of
                 # 2**(J - j2) remains.
                 second_order_coefficients = extract_scattering_coefficients(transform2, phis[j2], J - j2)
-                save_transform_to_disk(second_order_coefficients, {'j1': j1, 'alpha': alpha1, 'beta': beta1, 'gamma': gamma1, 'j2': j2, 'alpha2': alpha2, 'beta2': beta2, 'gamma2': gamma2, "J": J})
+                # save_transform_to_disk(second_order_coefficients, {'j1': j1, 'alpha': alpha1, 'beta': beta1, 'gamma': gamma1, 'j2': j2, 'alpha2': alpha2, 'beta2': beta2, 'gamma2': gamma2, "J": J})
                 scattering_coefficients.append(second_order_coefficients)
 
     scattering_coefficients = np.array(scattering_coefficients)

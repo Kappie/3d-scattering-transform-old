@@ -22,17 +22,18 @@ if __name__ == '__main__':
     UNAFFECTED = -1
 
     # number of samples of each class.
-    n_samples_class = 1
+    n_samples_class = "all"
     dataset = np.load(DATASET_PATH, mmap_mode="r")
     labels = np.load(LABELS_PATH)
     if n_samples_class != "all":
         dataset = dataset[np.r_[:n_samples_class, -n_samples_class:0]]
 
-    js = [0, 1]
+    js = [0, 1, 2, 3]
     J = 6
-    L = 2
-    sigma = 5
-    xi = np.array([np.pi*3/4, np.pi/6, np.pi/6])
+    L = 3
+    sigma = 2
+    # xi = np.array([np.pi*3/4, np.pi/6, np.pi/6])
+    xi = np.array([np.pi*3/4, 0, 0])
     output_location = generate_output_location(js, J, L, sigma)
 
     apply_scattering_transform_to_dataset(dataset, js, J, L, output_location, sigma=sigma, xi=xi)

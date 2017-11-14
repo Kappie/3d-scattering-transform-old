@@ -8,7 +8,7 @@ from sklearn_digits_tut import get_digits_classifier
 # 3D scattering transforms for disease classification in neuroimaging (2017).
 
 
-def approximate_gradient(classifier, x, X, k, epsilon=1e-5):
+def approximate_gradient(classifier, x, X, k=6, epsilon=1e-5):
     """
     classifier: outputs probability of vector x belonging to a certain class (G(x) in paper)
     x: input feature vector
@@ -22,11 +22,11 @@ def approximate_gradient(classifier, x, X, k, epsilon=1e-5):
     eigenvalues, eigenvectors = eigs(covariance_matrix, k=k)
     eigenvalues, eigenvectors = np.real(eigenvalues), np.real(eigenvectors)
 
-    classifier_x = classifier(x)
+    classifier_x = classifier.decision_function(x.reshape((1, -1)))
     gradient = np.zeros(eigenvectors.shape[0])
     for i in range(k):
         eigenvector = eigenvectors[:, i]
-        gradient += ((classifier_x - classifier(x + epsilon*eigenvector)) / epsilon) * eigenvector
+        gradient += ((classifier_x - classifier.decision_function((x + epsilon*eigenvector).reshape((1, -1)))) / epsilon) * eigenvector
 
     return gradient
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     digits = datasets.load_digits()
     feature_vectors = digits.data
     x = feature_vectors[0]
-    k = 20
+    k = 6
 
     gradient = approximate_gradient(stub_classifier, x, feature_vectors, k)
     visualize_gradient(gradient)

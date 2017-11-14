@@ -118,6 +118,7 @@ def filter_bank(width, height, depth, js, J, L, sigma, xi=XI_DEFAULT):
     filters['psi'] = []
 
     alphas = betas = gammas = [(n/L) * np.pi for n in range(L)]
+    print("using angles:", alphas)
 
     for j, alpha, beta, gamma in product(js, alphas, betas, gammas):
         psi = {'j': j, 'alpha': alpha, 'beta': beta, 'gamma': gamma}

@@ -101,7 +101,6 @@ def test_abs_after_convolve():
     print("average absolute value difference between abs(A) and abs_after_convolve(A, delta): ", np.average(np.abs(np.abs(A) - abs_convolution)))
 
 
-
 def benchmark_cpu_vs_gpu_different_sizes():
     x = z = 128
     y = 256
@@ -174,6 +173,18 @@ def test_apply_gabor_filter():
     plot3d(result)
 
 
+def test_rotated_gabor_filter():
+    x = z = 128
+    y = 256
+    j = 3
+    alpha = 2*np.pi/3
+    beta  = np.pi/3
+    gamma = 2*np.pi/3
+    sigma = 2
+    xi = np.array([3*np.pi/4, 0, 0])
+    gabor_filter = get_gabor_filter_gpu(x, y, z, j, alpha, beta, gamma, sigma=sigma, xi=xi)
+    plot3d(np.real(gabor_filter))
+    plot3d(np.imag(gabor_filter))
 
 
 if __name__ == '__main__':
@@ -186,4 +197,5 @@ if __name__ == '__main__':
     # benchmark_cpu_vs_gpu_different_sizes()
     # test_filter_bank()
     # test_apply_gaussian_filter()
-    test_apply_gabor_filter()
+    # test_apply_gabor_filter()
+    test_rotated_gabor_filter()
