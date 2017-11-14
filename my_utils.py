@@ -84,6 +84,16 @@ def abs_after_convolve(A, B, downsampling_resolution):
     return (result / n_elements).astype(np.complex64)
 
 
+def abs_after_convolve_cpu(A, B, downsampling_resolution):
+    """
+    A and B are both in real space. Calculate | A \conv B |.
+    """
+    A_fourier = scipy.fftpack.fftn(A)
+    B_fourier = scipy.fftpack.fftn(B)
+    downsampled_product = crop_freq_3d(A_fourier * B_fourier, downsampling_resolution)
+    return np.abs( scipy.fftpack.ifftn(downsampled_product) ).astype(np.complex64)
+
+
 # def fourier(signal):
 #     signal = signal.astype(np.complex64)
 #     signal_fourier = np.empty_like(signal)

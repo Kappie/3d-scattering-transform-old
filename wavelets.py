@@ -14,7 +14,7 @@ from gpu_vs_cpu_test import time_me
 from my_utils import crop_freq_3d, get_blocks_and_threads, downsample
 
 
-XI_DEFAULT = np.array([3*np.pi/4, 0, 0])
+XI_DEFAULT = np.array([3*np.pi/4, 0., 0.])
 A_DEFAULT = 2
 SIGMA_DEFAULT = 1.
 
@@ -69,14 +69,13 @@ def gabor_filter_gpu(width, height, depth, j, R, xi, a, sigma, result):
     normalization = 1/(a**(3*j))
     if x < width and y < height and z < depth:
         # Center array: change from [0 1 2 3 4 5 6 7] into [-4 -3 -2 -1 0 1 2 3]
-        x_prime = x - width // 2
-        y_prime = y - height // 2
-        z_prime = z - depth // 2
+        x_centered = x - width // 2
+        y_centered = y - height // 2
+        z_centered = z - depth // 2
         # Rotate and scale
-        x_prime = (R[0, 0]*x_prime + R[0, 1]*y_prime + R[0, 2]*z_prime) * scale_factor
-        y_prime = (R[1, 0]*x_prime + R[1, 1]*y_prime + R[1, 2]*z_prime) * scale_factor
-        z_prime = (R[2, 0]*x_prime + R[2, 1]*y_prime + R[2, 2]*z_prime) * scale_factor
-        # Scale factor must be raised to the power of the image dimension? This is in Bruna, but not in Adel.
+        x_prime = (R[0, 0]*x_centered + R[0, 1]*y_centered + R[0, 2]*z_centered) * scale_factor
+        y_prime = (R[1, 0]*x_centered + R[1, 1]*y_centered + R[1, 2]*z_centered) * scale_factor
+        z_prime = (R[2, 0]*x_centered + R[2, 1]*y_centered + R[2, 2]*z_centered) * scale_factor
         result[x, y, z] = normalization * cmath.exp(-(x_prime**2 + y_prime**2 + z_prime**2)/(2*sigma**2) + 1j*(x_prime*xi[0] + y_prime*xi[1] + z_prime*xi[2]))
 
 
@@ -105,7 +104,7 @@ def gaussian_filter_gpu(width, height, depth, j, a, sigma, result):
         result[x, y, z] = normalization * math.exp(-(x_prime**2 + y_prime**2 + z_prime**2)*scale_factor/(2*sigma**2))
 
 
-def filter_bank(width, height, depth, js, J, L, sigma):
+def filter_bank(width, height, depth, js, J, L, sigma, xi=XI_DEFAULT):
     """
     js: length scales for filters. Filters will be dilated by 2**j for j in js.
     J: length scale used for averaging over scattered signals. (coefficients will be approximately translationally
@@ -118,11 +117,11 @@ def filter_bank(width, height, depth, js, J, L, sigma):
     filters = {}
     filters['psi'] = []
 
-    alphas = betas = gammas = [(n/(L-1)) * np.pi for n in range(L)]
+    alphas = betas = gammas = [(n/L) * np.pi for n in range(L)]
 
     for j, alpha, beta, gamma in product(js, alphas, betas, gammas):
         psi = {'j': j, 'alpha': alpha, 'beta': beta, 'gamma': gamma}
-        psi_signal = get_gabor_filter_gpu(width, height, depth, j, alpha, beta, gamma, sigma=sigma)
+        psi_signal = get_gabor_filter_gpu(width, height, depth, j, alpha, beta, gamma, sigma=sigma, xi=xi)
         # When j_1 < j_2 < ... < j_n, we need j_2, ..., j_n downsampled at j_1, j_3, ..., j_n downsampled at j_2, etc.
         # resolution 0 is just the signal itself. See below header "Fast scattering computation" in Bruna (2013).
         for resolution in range(j + 1):
