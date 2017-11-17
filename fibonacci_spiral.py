@@ -21,6 +21,17 @@ def rotation_matrix(a, b):
     return matrix
 
 
+def rotation_matrices_fibonacci_spiral_unit_x(n):
+    """
+    For each of the n points spread evenly on a hemisphere using fibonacci spiral, return
+    rotation matrix that rotates (1, 0, 0) onto that point.
+    """
+    unit_x = np.array([1, 0, 0])
+    points = generate_fibonacci_spiral_hemisphere(n)
+    rotation_matrices = [ rotation_matrix(unit_x, np.array(point)) for point in points ]
+    return rotation_matrices
+
+
 def generate_fibonacci_spiral_hemisphere(n):
     """
     Generate N points evenly spaced on hemisphere with northpole (1, 0, 0) using
